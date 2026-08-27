@@ -188,6 +188,17 @@
         .tab:hover { color: #2d2d3a; }
         .tab.active { color: #f08020; border-bottom-color: #f08020; }
 
+        /* ── Tab badge ── */
+        .tab-badge {
+            display: inline-flex; align-items: center;
+            padding: .08rem .38rem; border-radius: 10px;
+            font-size: .62rem; font-weight: 700;
+            margin-left: .3rem; vertical-align: middle;
+        }
+        .tab-badge-estimated     { background: #d0eeff; color: #1a5a88; }
+        .tab-badge-mixed         { background: #fff0d0; color: #8a5010; }
+        .tab-badge-authoritative { background: #d8f0e0; color: #1a6a38; }
+
         /* ── Tab content ── */
         .tab-content { padding: 1rem 1.25rem; flex: 1; }
         .tab-pane { display: none; }
@@ -278,6 +289,7 @@
         .banner-estimate  { background: #fffbeb; border-left-color: #f08020; color: #7a4a10; }
         .banner-partial   { background: #fff3ee; border-left-color: #e05010; color: #8a3010; }
         .banner-excluded  { background: #fff0f0; border-left-color: #d03030; color: #8a1818; }
+        .banner-mixed     { background: #fff4e0; border-left-color: #d07010; color: #7a4010; }
 
         /* ── Pallet cards ── */
         .pallets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(265px, 1fr)); gap: .65rem; }
@@ -329,9 +341,9 @@
             padding: .35rem .65rem; text-align: left;
             font-size: .65rem; font-weight: 700; color: #606078; text-transform: uppercase; letter-spacing: .04em;
         }
-        .order-summary-table thead th:last-child, .order-summary-table thead th:nth-child(n+4) { text-align: right; }
+        .order-summary-table thead th:last-child, .order-summary-table thead th:nth-child(n+5) { text-align: right; }
         .order-summary-table tbody td { padding: .35rem .65rem; border-bottom: 1px solid #f0f0f5; }
-        .order-summary-table tbody td:nth-child(n+4) { text-align: right; }
+        .order-summary-table tbody td:nth-child(n+5) { text-align: right; }
 
         /* ── Modal ── */
         .modal-overlay {
@@ -493,7 +505,7 @@
                         </button>
                         <div class="actions-dropdown" id="actions-dropdown">
                             <div class="actions-dropdown-section">Actions</div>
-                            <div class="actions-dropdown-item" onclick="closeActionsMenu(); openOptModal();"><i class="fas fa-layer-group"></i> Run Pallet Optimization</div>
+                            <div class="actions-dropdown-item" id="action-run-opt" onclick="closeActionsMenu(); openOptModal();"><i class="fas fa-layer-group"></i> Run Pallet Optimization</div>
                             <div class="actions-dropdown-item" onclick="closeActionsMenu();"><i class="fas fa-edit"></i> Modify Trip</div>
                             <div class="actions-dropdown-item" onclick="closeActionsMenu();"><i class="fas fa-times-circle"></i> Cancel Trip</div>
                             <div class="actions-dropdown-item disabled"><i class="fas fa-print"></i> Print BOL</div>
@@ -563,10 +575,10 @@
         <!-- Tabs -->
         <div class="tab-bar">
             <div class="tab active" id="tabbtn-orders" onclick="switchTab('orders', this)">Orders</div>
-            <div class="tab" id="tabbtn-pallet-opt" onclick="switchTab('pallet-opt', this)">Pallet Optimization</div>
             <div class="tab" id="tabbtn-shipments" onclick="switchTab('shipments', this)">Shipments</div>
             <div class="tab" id="tabbtn-containers" onclick="switchTab('containers', this)">Containers</div>
             <div class="tab" id="tabbtn-shipped" onclick="switchTab('shipped', this)">Shipped Containers</div>
+            <div class="tab" id="tabbtn-pallet-opt" onclick="switchTab('pallet-opt', this)">Pallet Optimization <span class="tab-badge" id="pallet-opt-badge" style="display:none;"></span></div>
         </div>
 
         <!-- Tab content -->
@@ -622,19 +634,24 @@
                 </div>
                 <div id="opt-results-section" style="display:none;">
                     <div class="opt-results-header">
-                        <h3><i class="fas fa-check-circle" style="color:#28a060;"></i> Pallet Optimization Results <span style="font-size:.72rem;color:#9090a8;font-weight:400;margin-left:.3rem;" id="opt-results-label"></span></h3>
+                        <h3><i class="fas fa-check-circle" style="color:#28a060;"></i> Pallet Optimization Results</h3>
                         <div style="display:flex;gap:.35rem;">
+                            <div class="actions-wrap" id="sim-ofp-wrap" style="display:none;">
+                                <button class="btn btn-secondary btn-sm" onclick="toggleSimOfpMenu(event)"><i class="fas fa-flask"></i> Simulate OFP</button>
+                                <div class="actions-dropdown" id="sim-ofp-dropdown">
+                                    <div class="actions-dropdown-section">Prototype Testing</div>
+                                    <div class="actions-dropdown-item" onclick="closeSimOfpMenu(); simulateOfpUpdate(false);"><i class="fas fa-check-double"></i> All Orders → Authoritative</div>
+                                    <div class="actions-dropdown-item" onclick="closeSimOfpMenu(); simulateOfpUpdate(true);"><i class="fas fa-adjust"></i> Partial Orders → Mixed</div>
+                                </div>
+                            </div>
                             <button class="btn btn-secondary btn-sm" onclick="exportCsv()"><i class="fas fa-download"></i> Export CSV</button>
                             <button class="btn btn-secondary btn-sm" onclick="clearOptResults()"><i class="fas fa-times"></i> Clear</button>
                         </div>
                     </div>
                     <div class="opt-results-body">
-                        <div class="banner banner-estimate">
-                            <i class="fas fa-info-circle"></i>
-                            <div>
-                                <strong>Estimate only — based on simulated soft allocation.</strong>
-                                Inventory availability may change before order release. Results do not generate pick tasks or enable SSCC label printing. The authoritative run happens through OFP at order release.
-                            </div>
+                        <div id="state-banner" class="banner" style="display:none;">
+                            <i id="state-banner-icon" class="fas fa-info-circle"></i>
+                            <div id="state-banner-content"></div>
                         </div>
                         <div class="banner banner-partial" id="partial-banner" style="display:none;">
                             <i class="fas fa-exclamation-triangle"></i>
@@ -663,6 +680,7 @@
                                 <thead>
                                     <tr>
                                         <th>Order</th><th>Customer</th><th>Trading Partner</th>
+                                        <th>Result Type</th>
                                         <th>Full Pallet Picks</th><th>Pallet Builds</th><th>Total Packs</th><th>Haz Packs</th>
                                     </tr>
                                 </thead>
@@ -750,6 +768,10 @@
                     </td>
                 </tr>
             </table>
+            <div class="banner banner-estimate" id="modal-auth-note" style="display:none;">
+                <i class="fas fa-lock" style="margin-top:.1rem;flex-shrink:0;"></i>
+                <div><strong>Some orders excluded:</strong> <span></span></div>
+            </div>
             <p style="font-size:.72rem;font-weight:700;color:#686880;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Trading Partner Settings</p>
             <table class="tp-settings-table">
                 <thead>
@@ -829,7 +851,9 @@
 const state = {
     result: null,
     auditLog: [],
-    committed: false
+    committed: false,
+    resultType: 'none',
+    orderResultTypes: {}
 };
 
 // ── TP configurations (in production, pulled from trading partner master) ──
@@ -946,7 +970,7 @@ function toggleActionsMenu(e) {
     document.getElementById('actions-dropdown').classList.toggle('open');
 }
 function closeActionsMenu() { document.getElementById('actions-dropdown').classList.remove('open'); }
-document.addEventListener('click', () => closeActionsMenu());
+document.addEventListener('click', () => { closeActionsMenu(); closeSimOfpMenu(); });
 
 // ── Modal helpers ──────────────────────────────────────────────────────────
 function showModalStep(step) {
@@ -967,17 +991,40 @@ function triggerOptimizationError() {
 }
 
 function openOptModal() {
+    if (state.resultType === 'authoritative') return;
+
+    // Determine eligible orders — exclude Authoritative when Mixed
+    _eligibleOrders = state.resultType === 'mixed'
+        ? TRIP_ORDERS.filter(o => state.orderResultTypes[o.id] !== 'authoritative')
+        : TRIP_ORDERS;
+
     document.getElementById('overwrite-note').style.display = state.result ? 'inline' : 'none';
-    // Check for missing dims
-    const allItems = TRIP_ORDERS.flatMap(o => o.items);
+
+    // Show note when some orders are excluded due to authoritative results
+    const authCount = TRIP_ORDERS.length - _eligibleOrders.length;
+    const authNote = document.getElementById('modal-auth-note');
+    if (authCount > 0) {
+        authNote.style.display = 'flex';
+        authNote.querySelector('span').textContent =
+            `${authCount} order${authCount > 1 ? 's' : ''} with authoritative results ${authCount > 1 ? 'are' : 'is'} excluded from this run and will not be overwritten.`;
+    } else { authNote.style.display = 'none'; }
+
+    // Check for missing dims (among eligible orders only)
+    const allItems = _eligibleOrders.flatMap(o => o.items);
     const missing  = allItems.filter(i => !hasDims(i));
     const missingEl = document.getElementById('modal-missing-dims');
     if (missing.length > 0) {
         document.getElementById('modal-missing-dims-text').textContent = missing.map(i => i.sku).join(', ');
         missingEl.style.display = 'flex';
     } else { missingEl.style.display = 'none'; }
-    // Build per-TP settings rows
-    const tps = [...new Set(TRIP_ORDERS.map(o => o.tp))].sort();
+
+    // Eligible orders summary row
+    const eligibleIds = _eligibleOrders.map(o => o.id).join(', ');
+    document.getElementById('confirm-eligible').textContent =
+        `${_eligibleOrders.length} order${_eligibleOrders.length !== 1 ? 's' : ''} in New or Released status (${eligibleIds})`;
+
+    // Build per-TP settings rows from eligible orders only
+    const tps = [...new Set(_eligibleOrders.map(o => o.tp))].sort();
     document.getElementById('confirm-tp-settings').innerHTML = tps.map(tp => {
         const cfg = tpConfig(tp);
         const mixedHtml = cfg.allowMixed
@@ -1010,10 +1057,11 @@ function isOversized(item) {
 }
 
 // ── Pallet Cubing ──────────────────────────────────────────────────────────
-function runPalletCubing() {
+function runPalletCubing(orders) {
+    orders = orders || TRIP_ORDERS;
     const palletTareLbs = 50;
 
-    const allItems = TRIP_ORDERS.flatMap(o => o.items.map(i => ({...i, orderId: o.id})));
+    const allItems = orders.flatMap(o => o.items.map(i => ({...i, orderId: o.id})));
     const usable   = allItems.filter(i => hasDims(i) && !isOversized(i));
     const excluded = allItems.filter(i => !hasDims(i)).map(i => i.sku);
     const oversized = allItems.filter(isOversized).map(i => i.sku);
@@ -1081,10 +1129,10 @@ function runPalletCubing() {
     const totalGrossWeight = builds.reduce((s,b)=>s+b.grossW,0);
 
     // Simulate partial inventory availability: first two eligible orders are partially available
-    const partialAllocOrders = TRIP_ORDERS.slice(0, 2).map(o => o.id);
+    const partialAllocOrders = orders.slice(0, 2).map(o => o.id);
 
     return {
-        orderIds: TRIP_ORDERS.map(o=>o.id),
+        orderIds: orders.map(o=>o.id),
         existingFullPallets: simulatedFullPicks,
         palletBuilds: builds.length,
         totalPallets: builds.length + simulatedFullPicks,
@@ -1119,7 +1167,7 @@ function finalizePallet(p, PALLET, tareLbs, idx, orderId) {
 }
 
 // ── Optimization flow ──────────────────────────────────────────────────────
-let _timer = null, _interval = null, _cancelled = false;
+let _timer = null, _interval = null, _cancelled = false, _eligibleOrders = null;
 
 function executeOptimization() {
     _cancelled = false;
@@ -1132,7 +1180,7 @@ function executeOptimization() {
         clearInterval(_interval);
         if (_cancelled) return;
         if (document.getElementById('sim-error-chk').checked) { triggerOptimizationError(); return; }
-        state.result = runPalletCubing();
+        state.result = runPalletCubing(_eligibleOrders);
         renderModalSummary();
         showModalStep(3);
     }, 2200);
@@ -1179,6 +1227,10 @@ function renderModalSummary() {
 function commitResults() {
     const r = state.result; if (!r) return;
     state.committed = true;
+    // Only mark eligible (Estimated) orders — preserve any Authoritative orders
+    (_eligibleOrders || TRIP_ORDERS).forEach(o => { state.orderResultTypes[o.id] = 'estimated'; });
+    const authCount = TRIP_ORDERS.filter(o => state.orderResultTypes[o.id] === 'authoritative').length;
+    state.resultType = authCount > 0 ? 'mixed' : 'estimated';
 
     // Update trip overview fields
     ['field-total-containers','field-total-weight','field-total-packs'].forEach(id => {
@@ -1192,7 +1244,6 @@ function commitResults() {
     switchTab('pallet-opt', 'pallet-opt');
     document.getElementById('opt-empty-state').style.display = 'none';
     document.getElementById('opt-results-section').style.display = 'block';
-    document.getElementById('opt-results-label').textContent = `— ${r.totalPallets} pallets (${r.palletBuilds} builds + ${r.existingFullPallets} full picks)`;
 
     // Summary cards
     document.getElementById('summary-cards').innerHTML = summaryCardsHtml([
@@ -1227,31 +1278,11 @@ function commitResults() {
     } else { exclBanner.style.display = 'none'; }
 
     // Per-order summary
-    const perOrder = {};
-    r.orderIds.forEach(oid => {
-        const o = TRIP_ORDERS.find(x => x.id === oid);
-        perOrder[oid] = {orderId:oid, customer:o?.buName||'', tp:o?.tp||'', fullPicks:0, builds:0, totalPacks:0, hazPacks:0};
-    });
-    r.builds.filter(b=>b.isFullPick).forEach(b => { if(perOrder[b.orderId]) perOrder[b.orderId].fullPicks++; });
-    r.builds.filter(b=>!b.isFullPick).forEach(b => { if(perOrder[b.orderId]) perOrder[b.orderId].builds++; });
-    const allItems = TRIP_ORDERS.flatMap(o=>o.items.map(i=>({...i,orderId:o.id})));
-    allItems.filter(hasDims).forEach(i => {
-        if (perOrder[i.orderId]) {
-            perOrder[i.orderId].totalPacks += i.quantity;
-            if (i.hazardous) perOrder[i.orderId].hazPacks += i.quantity;
-        }
-    });
-    document.getElementById('order-summary-body').innerHTML = Object.values(perOrder).map(p=>`
-        <tr>
-            <td style="font-weight:700;color:#f08020;">${p.orderId}</td>
-            <td>${p.customer}</td>
-            <td>${p.tp}</td>
-            <td>${p.fullPicks}</td>
-            <td>${p.builds}</td>
-            <td>${p.totalPacks}</td>
-            <td style="color:${p.hazPacks>0?'#c02020':'#2d2d3a'};font-weight:${p.hazPacks>0?700:400};">${p.hazPacks}</td>
-        </tr>`).join('');
-    document.getElementById('order-summary-section').style.display = 'block';
+    renderOrderSummary();
+
+    // Badge + state banner
+    updatePalletOptBadge();
+    document.getElementById('sim-ofp-wrap').style.display = '';
 
     // Pallet cards
     document.getElementById('pallets-grid').innerHTML = r.builds.map(renderPalletCard).join('');
@@ -1266,6 +1297,10 @@ function commitResults() {
 
 function clearOptResults() {
     state.result = null; state.committed = false;
+    state.resultType = 'none'; state.orderResultTypes = {};
+    updatePalletOptBadge();
+    refreshActionsMenu();
+    document.getElementById('sim-ofp-wrap').style.display = 'none';
     document.getElementById('opt-results-section').style.display = 'none';
     document.getElementById('opt-empty-state').style.display = '';
     ['field-total-containers','field-total-weight','field-total-packs'].forEach(id => {
@@ -1302,9 +1337,19 @@ function populateContainersTab(r) {
 }
 
 // ── Pallet card render ─────────────────────────────────────────────────────
+function resultTypeBadge(orderId) {
+    const rt = state.orderResultTypes[orderId] || 'estimated';
+    return rt === 'authoritative'
+        ? `<span class="tab-badge tab-badge-authoritative">Authoritative</span>`
+        : `<span class="tab-badge tab-badge-estimated">Estimated</span>`;
+}
+
 function renderPalletCard(b) {
     if (b.isFullPick) return `<div class="pallet-card full-pick">
-        <div class="pallet-card-header"><span class="pallet-id">${b.palletId}</span><span class="pallet-type-badge">48×40 GMA</span></div>
+        <div class="pallet-card-header">
+            <span class="pallet-id">${b.palletId}</span>${resultTypeBadge(b.orderId)}
+            <span class="pallet-type-badge" style="margin-left:auto;">48×40 GMA</span>
+        </div>
         <div style="font-size:.73rem;color:#1a6a38;"><i class="fas fa-check-circle" style="margin-right:.25rem;"></i>Full pallet pick — no build required</div>
     </div>`;
     const cfgClass = b.configType==='Mixed'?'config-mixed':'config-single';
@@ -1326,7 +1371,7 @@ function renderPalletCard(b) {
         : rows.slice(0,SHOW).join('') + `<span class="layers-more" onclick="this.nextElementSibling.style.display='block';this.style.display='none';">+ ${rows.length-SHOW} more layers…</span><div style="display:none;">${rows.slice(SHOW).join('')}</div>`;
     return `<div class="pallet-card">
         <div class="pallet-card-header">
-            <div><span class="pallet-id">${b.palletId}</span><span class="config-type-badge ${cfgClass}">${b.configType}</span>${tpNote}${oNote}</div>
+            <div><span class="pallet-id">${b.palletId}</span><span class="config-type-badge ${cfgClass}">${b.configType}</span>${tpNote}${oNote}${resultTypeBadge(b.orderId)}</div>
             <span class="pallet-type-badge">48×40 GMA</span>
         </div>
         <div class="pallet-metrics">
@@ -1340,6 +1385,111 @@ function renderPalletCard(b) {
         ${b.warnings.length?`<div class="pallet-warning">${b.warnings.join('; ')}</div>`:''}
     </div>`;
 }
+
+// ── Pallet opt badge & state banner ───────────────────────────────────────
+function updatePalletOptBadge() {
+    const badge = document.getElementById('pallet-opt-badge');
+    const stateBanner = document.getElementById('state-banner');
+    const stateBannerIcon = document.getElementById('state-banner-icon');
+    const stateBannerContent = document.getElementById('state-banner-content');
+    badge.className = 'tab-badge';
+    if (state.resultType === 'none') {
+        badge.style.display = 'none';
+        stateBanner.style.display = 'none';
+        return;
+    }
+    badge.style.display = 'inline-flex';
+    if (state.resultType === 'estimated') {
+        badge.classList.add('tab-badge-estimated');
+        badge.textContent = 'Estimated';
+        stateBanner.className = 'banner banner-estimate';
+        stateBanner.style.display = 'flex';
+        stateBannerIcon.className = 'fas fa-info-circle';
+        stateBannerContent.innerHTML = '<strong>Estimate only — based on simulated soft allocation.</strong> Inventory availability may change before order release. Results do not generate pick tasks or enable SSCC label printing. The authoritative run happens through OFP at order release.';
+    } else if (state.resultType === 'mixed') {
+        badge.classList.add('tab-badge-mixed');
+        badge.textContent = 'Mixed';
+        stateBanner.className = 'banner banner-mixed';
+        stateBanner.style.display = 'flex';
+        stateBannerIcon.className = 'fas fa-exclamation-triangle';
+        stateBannerContent.innerHTML = '<strong>This trip contains a mix of estimated and authoritative pallet results.</strong> Orders not yet processed through OFP are shown as Estimated.';
+    } else if (state.resultType === 'authoritative') {
+        badge.classList.add('tab-badge-authoritative');
+        badge.textContent = 'Authoritative';
+        stateBanner.style.display = 'none';
+    }
+}
+
+// ── Per-order summary (extracted so it can be re-rendered on OFP simulate) ─
+function renderOrderSummary() {
+    const r = state.result;
+    const perOrder = {};
+    r.orderIds.forEach(oid => {
+        const o = TRIP_ORDERS.find(x => x.id === oid);
+        perOrder[oid] = {orderId:oid, customer:o?.buName||'', tp:o?.tp||'', fullPicks:0, builds:0, totalPacks:0, hazPacks:0, resultType: state.orderResultTypes[oid] || 'estimated'};
+    });
+    r.builds.filter(b=>b.isFullPick).forEach(b => { if(perOrder[b.orderId]) perOrder[b.orderId].fullPicks++; });
+    r.builds.filter(b=>!b.isFullPick).forEach(b => { if(perOrder[b.orderId]) perOrder[b.orderId].builds++; });
+    const allItems = TRIP_ORDERS.flatMap(o=>o.items.map(i=>({...i,orderId:o.id})));
+    allItems.filter(hasDims).forEach(i => {
+        if (perOrder[i.orderId]) {
+            perOrder[i.orderId].totalPacks += i.quantity;
+            if (i.hazardous) perOrder[i.orderId].hazPacks += i.quantity;
+        }
+    });
+    const rtBadge = rt => rt === 'authoritative'
+        ? `<span class="status-badge status-released" style="font-size:.65rem;">Authoritative</span>`
+        : `<span class="status-badge status-new" style="font-size:.65rem;">Estimated</span>`;
+    document.getElementById('order-summary-body').innerHTML = Object.values(perOrder).map(p=>`
+        <tr>
+            <td style="font-weight:700;color:#f08020;">${p.orderId}</td>
+            <td>${p.customer}</td>
+            <td>${p.tp}</td>
+            <td>${rtBadge(p.resultType)}</td>
+            <td>${p.fullPicks}</td>
+            <td>${p.builds}</td>
+            <td>${p.totalPacks}</td>
+            <td style="color:${p.hazPacks>0?'#c02020':'#2d2d3a'};font-weight:${p.hazPacks>0?700:400};">${p.hazPacks}</td>
+        </tr>`).join('');
+    document.getElementById('order-summary-section').style.display = 'block';
+}
+
+// ── Simulate OFP update (prototype only) ──────────────────────────────────
+function simulateOfpUpdate(partial) {
+    if (!state.result) return;
+    const orderIds = TRIP_ORDERS.map(o => o.id);
+    const cutoff = partial ? Math.ceil(orderIds.length / 2) : orderIds.length;
+    orderIds.forEach((oid, i) => {
+        state.orderResultTypes[oid] = i < cutoff ? 'authoritative' : 'estimated';
+    });
+    state.resultType = partial ? 'mixed' : 'authoritative';
+    renderOrderSummary();
+    document.getElementById('pallets-grid').innerHTML = state.result.builds.map(renderPalletCard).join('');
+    updatePalletOptBadge();
+    refreshActionsMenu();
+    addAuditEntry(partial
+        ? `OFP update simulated (partial): ${cutoff} of ${orderIds.length} orders updated to Authoritative.`
+        : 'OFP update simulated (all orders): all orders updated to Authoritative.');
+}
+
+function refreshActionsMenu() {
+    const item = document.getElementById('action-run-opt');
+    if (state.resultType === 'authoritative') {
+        item.classList.add('disabled');
+        item.onclick = null;
+        item.title = 'All pallet results are authoritative — cannot be overwritten from TMA.';
+    } else {
+        item.classList.remove('disabled');
+        item.onclick = () => { closeActionsMenu(); openOptModal(); };
+        item.title = '';
+    }
+}
+
+function toggleSimOfpMenu(e) {
+    e.stopPropagation();
+    document.getElementById('sim-ofp-dropdown').classList.toggle('open');
+}
+function closeSimOfpMenu() { document.getElementById('sim-ofp-dropdown').classList.remove('open'); }
 
 // ── CSV Export ─────────────────────────────────────────────────────────────
 function exportCsv() {
