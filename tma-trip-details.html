@@ -748,13 +748,13 @@
         <!-- Step 1: Confirm -->
         <div id="modal-step-1" class="modal-body">
             <p style="margin-bottom:1rem;color:#4a4a5a;font-size:.82rem;">
-                Confirm the details below, then click <strong>Run</strong> to calculate pallet assignments for all orders on this trip.
+                Confirm the details below, then click <strong>Run</strong> to calculate pallet assignments for all eligible orders on this trip.
                 <span id="overwrite-note" style="display:none;color:#c03030;font-weight:600;"> Existing pallet optimization results will be overwritten.</span>
             </p>
             <table class="confirm-table">
                 <tr><td>Trip</td><td>20260722163113</td></tr>
-                <tr><td>Facility</td><td>Gold Parts Co — DEMOSAND3PL</td></tr>
-                <tr><td>Orders on Trip</td><td>6 orders (ORD-1977, ORD-1894, ORD-1893, ORD-1892, ORD-1891, ORD-1890)</td></tr>
+                <tr><td>Facility</td><td>Warehouse A — Atlanta, GA</td></tr>
+                <tr><td>Orders on Trip</td><td>ORD-1977, ORD-1894, ORD-1893, ORD-1892, ORD-1891, ORD-1890</td></tr>
                 <tr><td>Eligible Orders</td><td id="confirm-eligible">6 orders in New or Released status</td></tr>
                 <tr>
                     <td>Container Allocation Method</td>
@@ -768,10 +768,6 @@
                     </td>
                 </tr>
             </table>
-            <div class="banner banner-estimate" id="modal-auth-note" style="display:none;">
-                <i class="fas fa-lock" style="margin-top:.1rem;flex-shrink:0;"></i>
-                <div><strong>Some orders excluded:</strong> <span></span></div>
-            </div>
             <p style="font-size:.72rem;font-weight:700;color:#686880;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Trading Partner Settings</p>
             <table class="tp-settings-table">
                 <thead>
@@ -1000,14 +996,6 @@ function openOptModal() {
 
     document.getElementById('overwrite-note').style.display = state.result ? 'inline' : 'none';
 
-    // Show note when some orders are excluded due to authoritative results
-    const authCount = TRIP_ORDERS.length - _eligibleOrders.length;
-    const authNote = document.getElementById('modal-auth-note');
-    if (authCount > 0) {
-        authNote.style.display = 'flex';
-        authNote.querySelector('span').textContent =
-            `${authCount} order${authCount > 1 ? 's' : ''} with authoritative results ${authCount > 1 ? 'are' : 'is'} excluded from this run and will not be overwritten.`;
-    } else { authNote.style.display = 'none'; }
 
     // Check for missing dims (among eligible orders only)
     const allItems = _eligibleOrders.flatMap(o => o.items);
@@ -1020,8 +1008,8 @@ function openOptModal() {
 
     // Eligible orders summary row
     const eligibleIds = _eligibleOrders.map(o => o.id).join(', ');
-    document.getElementById('confirm-eligible').textContent =
-        `${_eligibleOrders.length} order${_eligibleOrders.length !== 1 ? 's' : ''} in New or Released status (${eligibleIds})`;
+    document.getElementById('confirm-eligible').innerHTML =
+        `${eligibleIds}<div style="font-size:.68rem;color:#9090a8;font-weight:400;margin-top:.2rem;">Orders with no prior results or Estimated results. Authoritative orders are excluded.</div>`;
 
     // Build per-TP settings rows from eligible orders only
     const tps = [...new Set(_eligibleOrders.map(o => o.tp))].sort();
