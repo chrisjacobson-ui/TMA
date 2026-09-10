@@ -197,7 +197,7 @@
         }
         .tab-badge-estimated     { background: #d0eeff; color: #1a5a88; }
         .tab-badge-mixed         { background: #fff0d0; color: #8a5010; }
-        .tab-badge-authoritative { background: #d8f0e0; color: #1a6a38; }
+        .tab-badge-planned       { background: #d8f0e0; color: #1a6a38; }
 
         /* ── Tab content ── */
         .tab-content { padding: 1rem 1.25rem; flex: 1; }
@@ -578,7 +578,7 @@
             <div class="tab" id="tabbtn-shipments" onclick="switchTab('shipments', this)">Shipments</div>
             <div class="tab" id="tabbtn-containers" onclick="switchTab('containers', this)">Containers</div>
             <div class="tab" id="tabbtn-shipped" onclick="switchTab('shipped', this)">Shipped Containers</div>
-            <div class="tab" id="tabbtn-pallet-opt" onclick="switchTab('pallet-opt', this)">Pallet Optimization <span class="tab-badge" id="pallet-opt-badge" style="display:none;"></span></div>
+            <div class="tab" id="tabbtn-pallet-opt" onclick="switchTab('pallet-opt', this)">Pallet Optimization</div>
         </div>
 
         <!-- Tab content -->
@@ -634,13 +634,13 @@
                 </div>
                 <div id="opt-results-section" style="display:none;">
                     <div class="opt-results-header">
-                        <h3><i class="fas fa-check-circle" style="color:#28a060;"></i> Pallet Optimization Results</h3>
+                        <h3><i class="fas fa-check-circle" style="color:#28a060;"></i> Pallet Optimization Results <span class="tab-badge" id="pallet-opt-badge" style="display:none;"></span></h3>
                         <div style="display:flex;gap:.35rem;">
                             <div class="actions-wrap" id="sim-ofp-wrap" style="display:none;">
                                 <button class="btn btn-secondary btn-sm" onclick="toggleSimOfpMenu(event)"><i class="fas fa-flask"></i> Simulate OFP</button>
                                 <div class="actions-dropdown" id="sim-ofp-dropdown">
                                     <div class="actions-dropdown-section">Prototype Testing</div>
-                                    <div class="actions-dropdown-item" onclick="closeSimOfpMenu(); simulateOfpUpdate(false);"><i class="fas fa-check-double"></i> All Orders → Authoritative</div>
+                                    <div class="actions-dropdown-item" onclick="closeSimOfpMenu(); simulateOfpUpdate(false);"><i class="fas fa-check-double"></i> All Orders → Planned</div>
                                     <div class="actions-dropdown-item" onclick="closeSimOfpMenu(); simulateOfpUpdate(true);"><i class="fas fa-adjust"></i> Partial Orders → Mixed</div>
                                 </div>
                             </div>
@@ -987,11 +987,11 @@ function triggerOptimizationError() {
 }
 
 function openOptModal() {
-    if (state.resultType === 'authoritative') return;
+    if (state.resultType === 'planned') return;
 
-    // Determine eligible orders — exclude Authoritative when Mixed
+    // Determine eligible orders — exclude Planned when Mixed
     _eligibleOrders = state.resultType === 'mixed'
-        ? TRIP_ORDERS.filter(o => state.orderResultTypes[o.id] !== 'authoritative')
+        ? TRIP_ORDERS.filter(o => state.orderResultTypes[o.id] !== 'planned')
         : TRIP_ORDERS;
 
     document.getElementById('overwrite-note').style.display = state.result ? 'inline' : 'none';
@@ -1009,7 +1009,7 @@ function openOptModal() {
     // Eligible orders summary row
     const eligibleIds = _eligibleOrders.map(o => o.id).join(', ');
     document.getElementById('confirm-eligible').innerHTML =
-        `${eligibleIds}<div style="font-size:.68rem;color:#9090a8;font-weight:400;margin-top:.2rem;">Orders with no prior results or Estimated results. Authoritative orders are excluded.</div>`;
+        `${eligibleIds}<div style="font-size:.68rem;color:#9090a8;font-weight:400;margin-top:.2rem;">Orders with no prior results or Estimated results. Planned orders are excluded.</div>`;
 
     // Build per-TP settings rows from eligible orders only
     const tps = [...new Set(_eligibleOrders.map(o => o.tp))].sort();
@@ -1215,9 +1215,9 @@ function renderModalSummary() {
 function commitResults() {
     const r = state.result; if (!r) return;
     state.committed = true;
-    // Only mark eligible (Estimated) orders — preserve any Authoritative orders
+    // Only mark eligible (Estimated) orders — preserve any Planned orders
     (_eligibleOrders || TRIP_ORDERS).forEach(o => { state.orderResultTypes[o.id] = 'estimated'; });
-    const authCount = TRIP_ORDERS.filter(o => state.orderResultTypes[o.id] === 'authoritative').length;
+    const authCount = TRIP_ORDERS.filter(o => state.orderResultTypes[o.id] === 'planned').length;
     state.resultType = authCount > 0 ? 'mixed' : 'estimated';
 
     // Update trip overview fields
@@ -1327,8 +1327,8 @@ function populateContainersTab(r) {
 // ── Pallet card render ─────────────────────────────────────────────────────
 function resultTypeBadge(orderId) {
     const rt = state.orderResultTypes[orderId] || 'estimated';
-    return rt === 'authoritative'
-        ? `<span class="tab-badge tab-badge-authoritative">Authoritative</span>`
+    return rt === 'planned'
+        ? `<span class="tab-badge tab-badge-planned">Planned</span>`
         : `<span class="tab-badge tab-badge-estimated">Estimated</span>`;
 }
 
@@ -1393,17 +1393,17 @@ function updatePalletOptBadge() {
         stateBanner.className = 'banner banner-estimate';
         stateBanner.style.display = 'flex';
         stateBannerIcon.className = 'fas fa-info-circle';
-        stateBannerContent.innerHTML = '<strong>Estimate only — based on simulated soft allocation.</strong> Inventory availability may change before order release. Results do not generate pick tasks or enable SSCC label printing. The authoritative run happens through OFP at order release.';
+        stateBannerContent.innerHTML = '<strong>Estimate only — based on simulated soft allocation.</strong> Inventory availability may change before order release. Results do not generate pick tasks or enable SSCC label printing. Planned results are generated through OFP at order release.';
     } else if (state.resultType === 'mixed') {
         badge.classList.add('tab-badge-mixed');
         badge.textContent = 'Mixed';
         stateBanner.className = 'banner banner-mixed';
         stateBanner.style.display = 'flex';
         stateBannerIcon.className = 'fas fa-exclamation-triangle';
-        stateBannerContent.innerHTML = '<strong>This trip contains a mix of estimated and authoritative pallet results.</strong> Orders not yet processed through OFP are shown as Estimated.';
-    } else if (state.resultType === 'authoritative') {
-        badge.classList.add('tab-badge-authoritative');
-        badge.textContent = 'Authoritative';
+        stateBannerContent.innerHTML = '<strong>This trip contains a mix of estimated and planned pallet results.</strong> Orders not yet processed through OFP are shown as Estimated.';
+    } else if (state.resultType === 'planned') {
+        badge.classList.add('tab-badge-planned');
+        badge.textContent = 'Planned';
         stateBanner.style.display = 'none';
     }
 }
@@ -1425,8 +1425,8 @@ function renderOrderSummary() {
             if (i.hazardous) perOrder[i.orderId].hazPacks += i.quantity;
         }
     });
-    const rtBadge = rt => rt === 'authoritative'
-        ? `<span class="status-badge status-released" style="font-size:.65rem;">Authoritative</span>`
+    const rtBadge = rt => rt === 'planned'
+        ? `<span class="status-badge status-released" style="font-size:.65rem;">Planned</span>`
         : `<span class="status-badge status-new" style="font-size:.65rem;">Estimated</span>`;
     document.getElementById('order-summary-body').innerHTML = Object.values(perOrder).map(p=>`
         <tr>
@@ -1448,24 +1448,24 @@ function simulateOfpUpdate(partial) {
     const orderIds = TRIP_ORDERS.map(o => o.id);
     const cutoff = partial ? Math.ceil(orderIds.length / 2) : orderIds.length;
     orderIds.forEach((oid, i) => {
-        state.orderResultTypes[oid] = i < cutoff ? 'authoritative' : 'estimated';
+        state.orderResultTypes[oid] = i < cutoff ? 'planned' : 'estimated';
     });
-    state.resultType = partial ? 'mixed' : 'authoritative';
+    state.resultType = partial ? 'mixed' : 'planned';
     renderOrderSummary();
     document.getElementById('pallets-grid').innerHTML = state.result.builds.map(renderPalletCard).join('');
     updatePalletOptBadge();
     refreshActionsMenu();
     addAuditEntry(partial
-        ? `OFP update simulated (partial): ${cutoff} of ${orderIds.length} orders updated to Authoritative.`
-        : 'OFP update simulated (all orders): all orders updated to Authoritative.');
+        ? `OFP update simulated (partial): ${cutoff} of ${orderIds.length} orders updated to Planned.`
+        : 'OFP update simulated (all orders): all orders updated to Planned.');
 }
 
 function refreshActionsMenu() {
     const item = document.getElementById('action-run-opt');
-    if (state.resultType === 'authoritative') {
+    if (state.resultType === 'planned') {
         item.classList.add('disabled');
         item.onclick = null;
-        item.title = 'All pallet results are authoritative — cannot be overwritten from TMA.';
+        item.title = 'All pallet results are planned — cannot be overwritten from TMA.';
     } else {
         item.classList.remove('disabled');
         item.onclick = () => { closeActionsMenu(); openOptModal(); };
