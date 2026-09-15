@@ -1104,10 +1104,23 @@ function runPalletCubing(orders) {
 
     // Simulate full pallet picks
     const simulatedFullPicks = Math.max(0, Math.floor(usable.reduce((s,i)=>s+i.quantity,0) / 120));
-    const fullPicks = Array.from({length:simulatedFullPicks}, (_,e) => ({
-        palletId:`FPL-${String(e+1).padStart(3,'0')}`, lineItems:[{sku:'(full pallet pick)',desc:'Container allocation',qty:1}],
-        grossW:0, stackH:0, cubeUtil:100, configType:'Full Pick', tp:'', orderId:TRIP_ORDERS[e % TRIP_ORDERS.length].id, isFullPick:true, warnings:[]
-    }));
+    const fullPicks = Array.from({length:simulatedFullPicks}, (_,e) => {
+        const assignedOrder = TRIP_ORDERS[e % TRIP_ORDERS.length];
+        const fpItem = assignedOrder ? ([...assignedOrder.items].filter(i=>i.lengthIn>0).sort((a,b)=>b.quantity-a.quantity)[0] || assignedOrder.items[0]) : null;
+        return {
+            palletId:`FPL-${String(e+1).padStart(3,'0')}`,
+            lineItems: fpItem ? [{sku:fpItem.sku,desc:fpItem.description,qty:fpItem.quantity,hazardous:fpItem.hazardous}] : [{sku:'—',desc:'Container allocation',qty:1,hazardous:false}],
+            grossW: 1800 + e * 150,
+            stackH:0, cubeUtil:100, configType:'Single-Item',
+            tp: fpItem ? fpItem.tp : '',
+            orderId: assignedOrder.id, isFullPick:true,
+            fpSku: fpItem ? fpItem.sku : '—',
+            fpDesc: fpItem ? fpItem.description : '—',
+            fpPackLevel: fpItem ? fpItem.packLevel : '—',
+            hazardous: fpItem ? fpItem.hazardous : false,
+            warnings:[]
+        };
+    });
 
     const totalCases  = usable.reduce((s,i)=>s+i.quantity,0);
     const hazCases    = usable.filter(i=>i.hazardous).reduce((s,i)=>s+i.quantity,0);
@@ -1306,9 +1319,11 @@ function populateContainersTab(r) {
     document.getElementById('containers-tbody').innerHTML = r.builds.map(b => {
         if (b.isFullPick) return `<tr>
             <td style="font-weight:700;color:#28a060;">${b.palletId}</td>
-            <td>48×40 GMA</td>
-            <td>Full Pick</td>
-            <td>—</td><td>—</td><td>—</td><td>—</td><td>100%</td>
+            <td>—</td>
+            <td><span class="config-type-badge config-single">Single-Item</span></td>
+            <td>${b.tp||'—'}</td>
+            <td>${b.orderId||'—'}</td>
+            <td>—</td><td>${b.grossW.toFixed(0)}</td><td>100%</td>
         </tr>`;
         const cfgClass = b.configType==='Mixed'?'config-mixed':'config-single';
         return `<tr>
@@ -1335,10 +1350,16 @@ function resultTypeBadge(orderId) {
 function renderPalletCard(b) {
     if (b.isFullPick) return `<div class="pallet-card full-pick">
         <div class="pallet-card-header">
-            <span class="pallet-id">${b.palletId}</span>${resultTypeBadge(b.orderId)}
-            <span class="pallet-type-badge" style="margin-left:auto;">48×40 GMA</span>
+            <div><span class="pallet-id">${b.palletId}</span><span class="config-type-badge config-single">Single-Item</span>${b.tp?`<span class="tp-note">${b.tp}</span>`:''}<span class="tp-note" style="color:#f08020;font-weight:600;">${b.orderId}</span>${resultTypeBadge(b.orderId)}</div>
         </div>
-        <div style="font-size:.73rem;color:#1a6a38;"><i class="fas fa-check-circle" style="margin-right:.25rem;"></i>Full pallet pick — no build required</div>
+        <div style="font-size:.73rem;color:#1a6a38;margin-bottom:.5rem;"><i class="fas fa-check-circle" style="margin-right:.25rem;"></i>Full pallet pick — no build required</div>
+        <div class="pallet-metrics" style="margin-bottom:.5rem;grid-template-columns:1fr;">
+            <div class="pallet-metric"><div class="m-val">${b.grossW.toFixed(0)}</div><div class="m-lbl">Gross Wt (lbs)</div></div>
+        </div>
+        <div class="layers-label"><i class="fas fa-box" style="margin-right:.25rem;"></i>Item</div>
+        <div class="layer-row" style="border:none;padding:.2rem 0;">
+            <span class="layer-sku">${b.fpSku}${b.hazardous?'<span class="haz-badge">HAZ</span>':''}</span>
+        </div>
     </div>`;
     const cfgClass = b.configType==='Mixed'?'config-mixed':'config-single';
     const tpNote   = b.tp&&b.tp!=='_default'?`<span class="tp-note">${b.tp}</span>`:'';
